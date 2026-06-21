@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="oklch(0.13 0.035 285)" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Constellation Control Room</title>
+    <link rel="stylesheet" href="admin.css" />
+    <script src="admin.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <section id="lock-view" class="lock-view" aria-labelledby="lock-title">
+        <div class="lock-signal" aria-hidden="true">
+          <span></span><i></i><b></b>
+        </div>
+        <div class="lock-panel">
+          <div class="brand">
+            <span class="brand-orbit" aria-hidden="true"><i></i></span>
+            <span>CONSTELLATION<br />CONTROL ROOM</span>
+          </div>
+          <div class="lock-copy">
+            <p>Kênh điều khiển riêng</p>
+            <h1 id="lock-title">Chứng minh bạn đang cầm tay lái.</h1>
+          </div>
+          <form id="unlock-form" class="unlock-form" novalidate>
+            <label for="password-input">Mật khẩu điều khiển</label>
+            <div class="password-row">
+              <input
+                id="password-input"
+                type="password"
+                autocomplete="current-password"
+                placeholder="•••"
+                aria-describedby="password-error"
+              />
+              <button type="submit">Mở Control Room</button>
+            </div>
+            <p id="password-error" class="form-error" role="alert"></p>
+          </form>
+          <p class="security-note">
+            Khóa giao diện cục bộ — phù hợp để tránh người xem vô tình truy cập.
+          </p>
+        </div>
+      </section>
+
+      <section id="control-view" class="control-view" aria-labelledby="control-title" hidden>
+        <header class="control-header">
+          <div class="header-brand">
+            <span class="brand-orbit brand-orbit--small" aria-hidden="true"><i></i></span>
+            <div>
+              <small>CONSTELLATION CONTROL ROOM</small>
+              <strong id="control-title">Bàn điều khiển kết quả</strong>
+            </div>
+          </div>
+          <div class="header-actions">
+            <a href="../" target="_blank" rel="noopener">Mở màn hình quay ↗</a>
+            <button id="lock-button" type="button">Khóa lại</button>
+          </div>
+        </header>
+
+        <div class="control-layout">
+          <section class="mission-panel" aria-labelledby="mission-title">
+            <div class="live-heading">
+              <div>
+                <span class="live-indicator" aria-hidden="true"></span>
+                <p>Đồng bộ trực tiếp</p>
+              </div>
+              <span id="sync-status">LOCAL / READY</span>
+            </div>
+
+            <div class="mission-copy">
+              <p>Chủ đề đang hoạt động</p>
+              <h1 id="mission-title">Chưa có chủ đề</h1>
+              <span id="mission-meta">0 quỹ đạo được phát hiện</span>
+            </div>
+
+            <div id="active-command" class="active-command" data-mode="random">
+              <div class="command-radar" aria-hidden="true">
+                <span></span><i></i><b></b>
+              </div>
+              <div>
+                <p>Lệnh hiện tại</p>
+                <strong id="active-command-title">Random công bằng</strong>
+                <span id="active-command-detail">Mỗi quỹ đạo có cơ hội như nhau.</span>
+              </div>
+            </div>
+
+            <div id="last-consumed" class="last-consumed" hidden>
+              <span>LỆNH GẦN NHẤT ĐÃ TIÊU THỤ</span>
+              <strong id="last-consumed-name"></strong>
+              <small id="last-consumed-time"></small>
+            </div>
+          </section>
+
+          <section class="director-panel" aria-labelledby="director-title">
+            <div class="panel-heading">
+              <div>
+                <p>Director mode</p>
+                <h2 id="director-title">Ai sẽ được gọi tên?</h2>
+              </div>
+              <span id="draft-state">CHƯA THAY ĐỔI</span>
+            </div>
+
+            <div class="mode-switch" role="radiogroup" aria-label="Chế độ chọn kết quả">
+              <button class="mode-option" data-mode="random" role="radio" aria-checked="true" type="button">
+                <span class="mode-symbol">∞</span>
+                <span><strong>Random</strong><small>Để trường tự quyết định</small></span>
+              </button>
+              <button class="mode-option" data-mode="next" role="radio" aria-checked="false" type="button">
+                <span class="mode-symbol">01</span>
+                <span><strong>Lượt kế tiếp</strong><small>Trúng một lần rồi tự tắt</small></span>
+              </button>
+              <button class="mode-option" data-mode="locked" role="radio" aria-checked="false" type="button">
+                <span class="mode-symbol">↻</span>
+                <span><strong>Khóa nhiều lượt</strong><small>Giữ kết quả đến khi bạn tắt</small></span>
+              </button>
+            </div>
+
+            <div id="target-picker" class="target-picker" hidden>
+              <div class="target-heading">
+                <div>
+                  <p>Chọn quỹ đạo đích</p>
+                  <strong id="selection-summary">Chưa chọn nhóm</strong>
+                </div>
+                <span id="visible-count">0 / 0</span>
+              </div>
+
+              <div class="search-field">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                  <path d="m15.5 15.5 4 4"></path>
+                </svg>
+                <label class="visually-hidden" for="group-filter">Tìm nhóm</label>
+                <input
+                  id="group-filter"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Tìm tên nhóm, không cần gõ dấu..."
+                />
+              </div>
+
+              <div id="admin-group-list" class="admin-group-list" role="radiogroup"></div>
+            </div>
+
+            <div class="director-footer">
+              <div class="safety-copy">
+                <span>Áp dụng ở lần bấm quay tiếp theo</span>
+                <small>Tab trình chiếu không hiển thị dấu hiệu điều khiển.</small>
+              </div>
+              <button id="apply-command" class="apply-command" type="button">
+                <span>Kích hoạt Random</span>
+                <small>⌘ / Ctrl + Enter</small>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <div id="admin-toast" class="admin-toast" role="status" aria-live="polite" hidden></div>
+      </section>
+    </main>
+  </body>
+</html>

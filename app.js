@@ -1,6 +1,7 @@
 const STORAGE_KEY = "name-constellation:v2";
 const LEGACY_STORAGE_KEY = "wheel-of-names:v1";
 const SESSION_KEY = "name-constellation:active";
+const ADMIN_CONTROL_KEY = "name-constellation:admin-control:v1";
 const MAX_GROUPS = 24;
 const TAU = Math.PI * 2;
 
@@ -50,10 +51,28 @@ const elements = {
   spinButton: document.querySelector("#spin-button"),
   groupList: document.querySelector("#group-list"),
   groupCount: document.querySelector("#group-count"),
+  groupSearchInput: document.querySelector("#group-search-input"),
+  groupSearchClear: document.querySelector("#group-search-clear"),
+  groupSearchMeta: document.querySelector("#group-search-meta"),
+  bulkEditButton: document.querySelector("#bulk-edit-button"),
+  clearAllButton: document.querySelector("#clear-all-button"),
   addGroupForm: document.querySelector("#add-group-form"),
   newGroupInput: document.querySelector("#new-group-input"),
   groupError: document.querySelector("#group-error"),
   groupItemTemplate: document.querySelector("#group-item-template"),
+  bulkDialog: document.querySelector("#bulk-dialog"),
+  bulkCloseButton: document.querySelector("#bulk-close-button"),
+  bulkCancelButton: document.querySelector("#bulk-cancel-button"),
+  bulkAppendMode: document.querySelector("#bulk-append-mode"),
+  bulkReplaceMode: document.querySelector("#bulk-replace-mode"),
+  bulkInput: document.querySelector("#bulk-input"),
+  bulkLineCount: document.querySelector("#bulk-line-count"),
+  bulkReadyCount: document.querySelector("#bulk-ready-count"),
+  bulkPreviewEmpty: document.querySelector("#bulk-preview-empty"),
+  bulkPreviewList: document.querySelector("#bulk-preview-list"),
+  bulkFinalTotal: document.querySelector("#bulk-final-total"),
+  bulkSkipSummary: document.querySelector("#bulk-skip-summary"),
+  bulkApplyButton: document.querySelector("#bulk-apply-button"),
   resultDialog: document.querySelector("#result-dialog"),
   resultTitle: document.querySelector("#result-title"),
   keepButton: document.querySelector("#keep-button"),
@@ -75,8 +94,16 @@ const state = {
   selectedGroupId: null,
   selectedIndex: -1,
   soundEnabled: false,
-  lastRemoval: null,
+  pendingUndo: null,
   toastTimer: null,
+  clearConfirmationTimer: null,
+  groupSearch: "",
+  bulkMode: "append",
+  bulkDrafts: {
+    append: "",
+    replace: "",
+  },
+  bulkAnalysis: null,
   spinStart: 0,
   spinDuration: 4200,
   revealGroupId: null,
@@ -142,6 +169,38 @@ function persistState() {
   );
 }
 
+function randomAdminControl(extra = {}) {
+  return {
+    mode: "random",
+    targetGroupId: null,
+    updatedAt: Date.now(),
+    ...extra,
+  };
+}
+
+function readAdminControl() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ADMIN_CONTROL_KEY));
+    const validModes = new Set(["random", "next", "locked"]);
+
+    if (!saved || !validModes.has(saved.mode)) {
+      return randomAdminControl();
+    }
+
+    return {
+      ...saved,
+      targetGroupId:
+        typeof saved.targetGroupId === "string" ? saved.targetGroupId : null,
+    };
+  } catch {
+    return randomAdminControl();
+  }
+}
+
+function persistAdminControl(control) {
+  localStorage.setItem(ADMIN_CONTROL_KEY, JSON.stringify(control));
+}
+
 function prefersReducedMotion() {
   return reducedMotionQuery.matches;
 }
@@ -178,6 +237,18 @@ function normalizeName(value) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function searchKey(value) {
+  return normalizeName(value)
+    .toLocaleLowerCase("vi")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/đ/g, "d");
+}
+
+function cloneGroups(groups = state.groups) {
+  return groups.map((group) => ({ ...group }));
+}
+
 function hasDuplicateName(name, excludedId = null) {
   const normalized = name.toLocaleLowerCase("vi");
   return state.groups.some(
@@ -191,7 +262,19 @@ function colorForIndex(index) {
 }
 
 function renderGroups() {
+  if (state.clearConfirmationTimer) {
+    resetClearConfirmation();
+  }
+
   elements.groupList.replaceChildren();
+  const searchQuery = searchKey(state.groupSearch);
+  const visibleGroups = state.groups
+    .map((group, index) => ({ group, index }))
+    .filter(({ group }) =>
+      searchQuery
+        ? searchKey(group.name).includes(searchQuery)
+        : true,
+    );
 
   if (state.groups.length === 0) {
     const emptyState = document.createElement("div");
@@ -199,9 +282,15 @@ function renderGroups() {
     emptyState.textContent =
       "Trường đang trống. Thêm cái tên đầu tiên để tạo một quỹ đạo.";
     elements.groupList.append(emptyState);
+  } else if (visibleGroups.length === 0) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "group-list-empty group-list-empty--search";
+    emptyState.innerHTML =
+      "<strong>Không tìm thấy quỹ đạo.</strong><span>Thử một từ khóa ngắn hơn.</span>";
+    elements.groupList.append(emptyState);
   }
 
-  state.groups.forEach((group, index) => {
+  visibleGroups.forEach(({ group, index }) => {
     const item = elements.groupItemTemplate.content.firstElementChild.cloneNode(true);
     const number = item.querySelector(".group-number");
     const label = item.querySelector("label");
@@ -252,11 +341,16 @@ function renderGroups() {
         return;
       }
 
+      state.pendingUndo = null;
+      hideToast();
       group.name = nextName;
       input.value = nextName;
       input.dataset.originalValue = nextName;
       deleteButton.setAttribute("aria-label", `Xóa ${nextName}`);
       persistState();
+      if (state.groupSearch) {
+        renderGroups();
+      }
       announce(`Đã đổi tên nhóm thành ${nextName}.`);
     });
 
@@ -265,9 +359,21 @@ function renderGroups() {
   });
 
   const count = state.groups.length;
+  const visibleCount = visibleGroups.length;
   elements.groupCount.textContent = String(count).padStart(2, "0");
+  if (elements.groupSearchInput.value !== state.groupSearch) {
+    elements.groupSearchInput.value = state.groupSearch;
+  }
+  elements.groupSearchClear.hidden = !searchQuery;
+  elements.groupSearchMeta.textContent = searchQuery
+    ? `${visibleCount} / ${count} quỹ đạo`
+    : count > 8
+      ? `${count} quỹ đạo · cuộn để xem thêm`
+      : "";
   elements.fieldIndex.textContent = `FIELD / ${String(count).padStart(2, "0")}`;
   elements.spinButton.disabled = count < 2 || state.isSpinning;
+  elements.bulkEditButton.disabled = state.isSpinning;
+  elements.clearAllButton.disabled = state.isSpinning || count === 0;
   elements.wheelStatus.textContent =
     count < 2
       ? "Cần ít nhất 2 quỹ đạo để chọn."
@@ -294,6 +400,9 @@ function addGroup(name) {
     return;
   }
 
+  state.pendingUndo = null;
+  hideToast();
+  state.groupSearch = "";
   state.groups.push({ id: createId(), name: normalized });
   elements.groupError.textContent = "";
   elements.newGroupInput.value = "";
@@ -313,24 +422,28 @@ function removeGroup(groupId) {
   const index = state.groups.findIndex((group) => group.id === groupId);
   if (index === -1) return;
 
+  const previousGroups = cloneGroups();
   const [removedGroup] = state.groups.splice(index, 1);
-  state.lastRemoval = { group: removedGroup, index };
+  state.pendingUndo = {
+    groups: previousGroups,
+    announcement: `Đã đưa ${removedGroup.name} trở lại trường.`,
+  };
   persistState();
   renderGroups();
   showToast(`Đã đưa ${removedGroup.name} ra khỏi trường.`, true);
   announce(`Đã xóa ${removedGroup.name}. Bạn có thể hoàn tác.`);
 }
 
-function undoRemoval() {
-  if (!state.lastRemoval) return;
+function undoLastAction() {
+  if (!state.pendingUndo) return;
 
-  const { group, index } = state.lastRemoval;
-  state.groups.splice(Math.min(index, state.groups.length), 0, group);
-  state.lastRemoval = null;
+  const { groups, announcement } = state.pendingUndo;
+  state.groups = cloneGroups(groups);
+  state.pendingUndo = null;
   persistState();
   renderGroups();
   hideToast();
-  announce(`Đã đưa ${group.name} trở lại trường.`);
+  announce(announcement);
 }
 
 function showToast(message, showUndo = false) {
@@ -351,6 +464,214 @@ function announce(message) {
   requestAnimationFrame(() => {
     elements.liveRegion.textContent = message;
   });
+}
+
+function cleanBulkLine(value) {
+  return normalizeName(
+    value.replace(/^\s*(?:(?:[-*•])\s+|(?:\d+[.)])\s+)/u, ""),
+  );
+}
+
+function analyzeBulkInput() {
+  const rawLines = elements.bulkInput.value.split(/\r?\n/u);
+  const activeLines = rawLines
+    .map((raw, index) => ({
+      raw,
+      lineNumber: index + 1,
+      name: cleanBulkLine(raw),
+    }))
+    .filter((line) => line.name);
+  const capacity =
+    state.bulkMode === "append" ? Math.max(0, MAX_GROUPS - state.groups.length) : MAX_GROUPS;
+  const existingNames = new Set(
+    state.bulkMode === "append"
+      ? state.groups.map((group) => group.name.toLocaleLowerCase("vi"))
+      : [],
+  );
+  const acceptedNames = new Set();
+  let acceptedCount = 0;
+
+  const lines = activeLines.map((line) => {
+    const key = line.name.toLocaleLowerCase("vi");
+    let status = "ready";
+    let message = "Sẵn sàng";
+
+    if (line.name.length > 60) {
+      status = "invalid";
+      message = "Quá 60 ký tự";
+    } else if (existingNames.has(key) || acceptedNames.has(key)) {
+      status = "duplicate";
+      message = "Trùng tên";
+    } else if (acceptedCount >= capacity) {
+      status = "overflow";
+      message = `Vượt giới hạn ${MAX_GROUPS}`;
+    } else {
+      acceptedNames.add(key);
+      acceptedCount += 1;
+    }
+
+    return { ...line, status, message };
+  });
+
+  const skippedCount = lines.length - acceptedCount;
+  const finalTotal =
+    state.bulkMode === "append" ? state.groups.length + acceptedCount : acceptedCount;
+
+  return {
+    rawLineCount: rawLines.filter((line) => line.trim()).length,
+    lines,
+    acceptedCount,
+    skippedCount,
+    finalTotal,
+  };
+}
+
+function renderBulkAnalysis() {
+  const analysis = analyzeBulkInput();
+  state.bulkAnalysis = analysis;
+  elements.bulkPreviewList.replaceChildren();
+  elements.bulkPreviewEmpty.hidden = analysis.lines.length > 0;
+  elements.bulkLineCount.textContent = `${analysis.rawLineCount} dòng`;
+  elements.bulkReadyCount.textContent = `${analysis.acceptedCount} sẵn sàng`;
+  elements.bulkFinalTotal.textContent = `Tổng sau khi áp dụng: ${analysis.finalTotal}`;
+  elements.bulkSkipSummary.textContent =
+    analysis.skippedCount > 0
+      ? `${analysis.skippedCount} dòng sẽ được bỏ qua`
+      : analysis.acceptedCount > 0
+        ? "Không có lỗi — sẵn sàng áp dụng"
+        : "Chưa có dữ liệu đầu vào";
+
+  analysis.lines.forEach((line) => {
+    const item = document.createElement("li");
+    item.className = `bulk-preview-item bulk-preview-item--${line.status}`;
+
+    const lineNumber = document.createElement("span");
+    lineNumber.className = "bulk-preview-number";
+    lineNumber.textContent = String(line.lineNumber).padStart(2, "0");
+
+    const name = document.createElement("strong");
+    name.textContent = line.name;
+
+    const status = document.createElement("span");
+    status.className = "bulk-preview-status";
+    status.textContent = line.message;
+
+    item.append(lineNumber, name, status);
+    elements.bulkPreviewList.append(item);
+  });
+
+  elements.bulkApplyButton.disabled = analysis.acceptedCount === 0;
+  const actionLabel =
+    state.bulkMode === "append"
+      ? `Thêm ${analysis.acceptedCount} quỹ đạo`
+      : `Thay bằng ${analysis.acceptedCount} quỹ đạo`;
+  elements.bulkApplyButton.querySelector("span").textContent =
+    analysis.acceptedCount > 0 ? actionLabel : "Chưa có nhóm hợp lệ";
+}
+
+function setBulkMode(mode, { preserveCurrentDraft = true } = {}) {
+  if (preserveCurrentDraft) {
+    state.bulkDrafts[state.bulkMode] = elements.bulkInput.value;
+  }
+
+  state.bulkMode = mode;
+  elements.bulkAppendMode.setAttribute("aria-pressed", String(mode === "append"));
+  elements.bulkReplaceMode.setAttribute("aria-pressed", String(mode === "replace"));
+  elements.bulkInput.value = state.bulkDrafts[mode];
+  renderBulkAnalysis();
+  elements.bulkInput.focus();
+}
+
+function openBulkEditor() {
+  if (state.isSpinning) return;
+
+  state.bulkDrafts.append = "";
+  state.bulkDrafts.replace = state.groups.map((group) => group.name).join("\n");
+  state.bulkMode = "append";
+  elements.bulkInput.value = "";
+  elements.bulkAppendMode.setAttribute("aria-pressed", "true");
+  elements.bulkReplaceMode.setAttribute("aria-pressed", "false");
+  renderBulkAnalysis();
+  elements.bulkDialog.showModal();
+  requestAnimationFrame(() => elements.bulkInput.focus());
+}
+
+function closeBulkEditor() {
+  elements.bulkDialog.close();
+  elements.bulkEditButton.focus();
+}
+
+function applyBulkChanges() {
+  const analysis = analyzeBulkInput();
+  const acceptedNames = analysis.lines
+    .filter((line) => line.status === "ready")
+    .map((line) => line.name);
+
+  if (acceptedNames.length === 0) return;
+
+  const previousGroups = cloneGroups();
+
+  if (state.bulkMode === "append") {
+    state.groups.push(...acceptedNames.map((name) => ({ id: createId(), name })));
+  } else {
+    const existingByName = new Map(
+      state.groups.map((group) => [group.name.toLocaleLowerCase("vi"), group]),
+    );
+    state.groups = acceptedNames.map((name) => {
+      const existing = existingByName.get(name.toLocaleLowerCase("vi"));
+      return existing ? { ...existing, name } : { id: createId(), name };
+    });
+  }
+
+  state.pendingUndo = {
+    groups: previousGroups,
+    announcement: "Đã hoàn tác thay đổi danh sách hàng loạt.",
+  };
+  state.groupSearch = "";
+  persistState();
+  renderGroups();
+  elements.bulkDialog.close();
+  const action =
+    state.bulkMode === "append"
+      ? `Đã thêm ${acceptedNames.length} quỹ đạo.`
+      : `Đã cập nhật toàn bộ ${acceptedNames.length} quỹ đạo.`;
+  showToast(action, true);
+  announce(`${action} Bạn có thể hoàn tác.`);
+  elements.bulkEditButton.focus();
+}
+
+function resetClearConfirmation() {
+  window.clearTimeout(state.clearConfirmationTimer);
+  state.clearConfirmationTimer = null;
+  elements.clearAllButton.classList.remove("is-confirming");
+  elements.clearAllButton.textContent = "Xóa tất cả";
+}
+
+function clearAllGroups() {
+  if (state.isSpinning || state.groups.length === 0) return;
+
+  if (!state.clearConfirmationTimer) {
+    const count = state.groups.length;
+    elements.clearAllButton.classList.add("is-confirming");
+    elements.clearAllButton.textContent = `Xác nhận xóa ${count}`;
+    announce(`Nhấn Xác nhận xóa ${count} lần nữa để xóa toàn bộ.`);
+    state.clearConfirmationTimer = window.setTimeout(resetClearConfirmation, 4500);
+    return;
+  }
+
+  const previousGroups = cloneGroups();
+  const removedCount = state.groups.length;
+  resetClearConfirmation();
+  state.groups = [];
+  state.groupSearch = "";
+  state.pendingUndo = {
+    groups: previousGroups,
+    announcement: `Đã khôi phục ${removedCount} quỹ đạo.`,
+  };
+  persistState();
+  renderGroups();
+  showToast(`Đã xóa toàn bộ ${removedCount} quỹ đạo.`, true);
+  announce(`Đã xóa toàn bộ ${removedCount} quỹ đạo. Bạn có thể hoàn tác.`);
 }
 
 function resizeField(entries) {
@@ -703,13 +1024,47 @@ function randomIndex(length) {
   return Math.floor(Math.random() * length);
 }
 
+function selectedIndexForSpin() {
+  const control = readAdminControl();
+
+  if (control.mode === "random" || !control.targetGroupId) {
+    return randomIndex(state.groups.length);
+  }
+
+  const controlledIndex = state.groups.findIndex(
+    (group) => group.id === control.targetGroupId,
+  );
+
+  if (controlledIndex === -1) {
+    persistAdminControl(
+      randomAdminControl({
+        resetReason: "target-missing",
+      }),
+    );
+    return randomIndex(state.groups.length);
+  }
+
+  if (control.mode === "next") {
+    const target = state.groups[controlledIndex];
+    persistAdminControl(
+      randomAdminControl({
+        lastConsumedGroupId: target.id,
+        lastConsumedGroupName: target.name,
+        lastConsumedAt: Date.now(),
+      }),
+    );
+  }
+
+  return controlledIndex;
+}
+
 function spinField() {
   if (state.isSpinning || state.groups.length < 2 || elements.resultDialog.open) {
     return;
   }
 
   hideToast();
-  state.selectedIndex = randomIndex(state.groups.length);
+  state.selectedIndex = selectedIndexForSpin();
   state.selectedGroupId = state.groups[state.selectedIndex].id;
   state.revealGroupId = null;
   state.isSpinning = true;
@@ -861,6 +1216,10 @@ function updateSoundButton() {
 
 function setEditingDisabled(disabled) {
   elements.editTopicButton.disabled = disabled;
+  elements.groupSearchInput.disabled = disabled;
+  elements.groupSearchClear.disabled = disabled;
+  elements.bulkEditButton.disabled = disabled;
+  elements.clearAllButton.disabled = disabled || state.groups.length === 0;
   elements.newGroupInput.disabled = disabled;
   elements.addGroupForm.querySelector("button").disabled = disabled;
   elements.groupList.querySelectorAll("input, button").forEach((control) => {
@@ -929,11 +1288,45 @@ elements.newGroupInput.addEventListener("input", () => {
   elements.groupError.textContent = "";
 });
 
+elements.groupSearchInput.addEventListener("input", () => {
+  state.groupSearch = elements.groupSearchInput.value;
+  renderGroups();
+});
+elements.groupSearchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.groupSearch) {
+    event.preventDefault();
+    state.groupSearch = "";
+    renderGroups();
+    elements.groupSearchInput.focus();
+  }
+});
+elements.groupSearchClear.addEventListener("click", () => {
+  state.groupSearch = "";
+  renderGroups();
+  elements.groupSearchInput.focus();
+});
+elements.bulkEditButton.addEventListener("click", openBulkEditor);
+elements.clearAllButton.addEventListener("click", clearAllGroups);
+elements.bulkCloseButton.addEventListener("click", closeBulkEditor);
+elements.bulkCancelButton.addEventListener("click", closeBulkEditor);
+elements.bulkAppendMode.addEventListener("click", () => setBulkMode("append"));
+elements.bulkReplaceMode.addEventListener("click", () => setBulkMode("replace"));
+elements.bulkInput.addEventListener("input", () => {
+  state.bulkDrafts[state.bulkMode] = elements.bulkInput.value;
+  renderBulkAnalysis();
+});
+elements.bulkInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    applyBulkChanges();
+  }
+});
+elements.bulkApplyButton.addEventListener("click", applyBulkChanges);
 elements.spinButton.addEventListener("click", spinField);
 elements.keepButton.addEventListener("click", keepWinner);
 elements.removeWinnerButton.addEventListener("click", removeWinner);
 elements.dialogCloseButton.addEventListener("click", keepWinner);
-elements.undoButton.addEventListener("click", undoRemoval);
+elements.undoButton.addEventListener("click", undoLastAction);
 elements.soundButton.addEventListener("click", toggleSound);
 elements.fullscreenButton.addEventListener("click", toggleFullscreen);
 
@@ -953,6 +1346,11 @@ elements.resultDialog.addEventListener("cancel", (event) => {
   keepWinner();
 });
 
+elements.bulkDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeBulkEditor();
+});
+
 document.addEventListener("fullscreenchange", updateFullscreenButton);
 
 document.addEventListener("keydown", (event) => {
@@ -966,7 +1364,8 @@ document.addEventListener("keydown", (event) => {
     event.code === "Space" &&
     !isTyping &&
     !elements.wheelView.hidden &&
-    !elements.resultDialog.open
+    !elements.resultDialog.open &&
+    !elements.bulkDialog.open
   ) {
     event.preventDefault();
     spinField();

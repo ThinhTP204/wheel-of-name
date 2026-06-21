@@ -166,6 +166,42 @@
               <span id="group-count" class="count-badge">0</span>
             </div>
 
+            <div class="roster-commands" aria-label="Quản lý danh sách nhanh">
+              <button id="bulk-edit-button" class="roster-command roster-command--primary" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"></path>
+                </svg>
+                <span>Thêm / sửa hàng loạt</span>
+              </button>
+              <button id="clear-all-button" class="roster-command roster-command--danger" type="button">
+                Xóa tất cả
+              </button>
+            </div>
+
+            <div class="group-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                <path d="m15.5 15.5 4 4"></path>
+              </svg>
+              <label class="visually-hidden" for="group-search-input">Tìm nhóm</label>
+              <input
+                id="group-search-input"
+                type="search"
+                autocomplete="off"
+                placeholder="Tìm trong các quỹ đạo..."
+              />
+              <button
+                id="group-search-clear"
+                class="group-search-clear"
+                type="button"
+                aria-label="Xóa tìm kiếm"
+                hidden
+              >
+                ×
+              </button>
+            </div>
+            <p id="group-search-meta" class="group-search-meta" aria-live="polite"></p>
+
             <div id="group-list" class="group-list"></div>
 
             <form id="add-group-form" class="add-group-form" novalidate>
@@ -220,6 +256,94 @@
         <button id="remove-winner-button" class="button button--remove" type="button">
           Xóa khỏi vòng
         </button>
+      </div>
+    </dialog>
+
+    <dialog id="bulk-dialog" class="bulk-dialog" aria-labelledby="bulk-title">
+      <div class="bulk-dialog-shell">
+        <header class="bulk-header">
+          <div>
+            <p>QUICK ARRAY EDITOR · TỐI ĐA 24</p>
+            <h2 id="bulk-title">Điều khiển cả trường trong một lần.</h2>
+          </div>
+          <button id="bulk-close-button" class="bulk-close-button" type="button" aria-label="Đóng">
+            ×
+          </button>
+        </header>
+
+        <div class="bulk-mode-switch" role="group" aria-label="Cách áp dụng danh sách">
+          <button
+            id="bulk-append-mode"
+            class="bulk-mode-button"
+            type="button"
+            aria-pressed="true"
+          >
+            <span>Thêm nhiều</span>
+            <small>Giữ danh sách hiện tại</small>
+          </button>
+          <button
+            id="bulk-replace-mode"
+            class="bulk-mode-button"
+            type="button"
+            aria-pressed="false"
+          >
+            <span>Sửa toàn bộ</span>
+            <small>Thay danh sách hiện tại</small>
+          </button>
+        </div>
+
+        <div class="bulk-workspace">
+          <section class="bulk-editor" aria-labelledby="bulk-editor-title">
+            <div class="bulk-section-heading">
+              <div>
+                <span>INPUT</span>
+                <h3 id="bulk-editor-title">Mỗi dòng là một nhóm</h3>
+              </div>
+              <span id="bulk-line-count" class="bulk-counter">0 dòng</span>
+            </div>
+            <textarea
+              id="bulk-input"
+              maxlength="4000"
+              spellcheck="false"
+              placeholder="Nhóm Mặt Trời&#10;Nhóm Biển Xanh&#10;Nhóm Cầu Vồng"
+              aria-labelledby="bulk-editor-title"
+              aria-describedby="bulk-input-help"
+            ></textarea>
+            <p id="bulk-input-help" class="bulk-help">
+              Có thể dán từ Excel, Google Sheets hoặc danh sách có bullet. Hệ thống tự làm sạch.
+            </p>
+          </section>
+
+          <section class="bulk-preview" aria-labelledby="bulk-preview-title">
+            <div class="bulk-section-heading">
+              <div>
+                <span>LIVE CHECK</span>
+                <h3 id="bulk-preview-title">Kiểm tra trước khi nhập</h3>
+              </div>
+              <span id="bulk-ready-count" class="bulk-counter bulk-counter--ready">0 sẵn sàng</span>
+            </div>
+            <div id="bulk-preview-empty" class="bulk-preview-empty">
+              Dán danh sách vào bên trái. Các dòng hợp lệ, trùng lặp và vượt giới hạn sẽ hiện ở đây.
+            </div>
+            <ol id="bulk-preview-list" class="bulk-preview-list"></ol>
+          </section>
+        </div>
+
+        <footer class="bulk-footer">
+          <div class="bulk-summary" aria-live="polite">
+            <strong id="bulk-final-total">Tổng sau khi áp dụng: 0</strong>
+            <span id="bulk-skip-summary">Chưa có dữ liệu đầu vào</span>
+          </div>
+          <div class="bulk-footer-actions">
+            <button id="bulk-cancel-button" class="bulk-secondary-button" type="button">
+              Hủy
+            </button>
+            <button id="bulk-apply-button" class="bulk-apply-button" type="button" disabled>
+              <span>Chưa có nhóm hợp lệ</span>
+              <small>⌘ / Ctrl + Enter</small>
+            </button>
+          </div>
+        </footer>
       </div>
     </dialog>
 
