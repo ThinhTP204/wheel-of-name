@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Trường quỹ đạo chọn nhóm dành cho lớp học và team building."
+    />
+    <meta name="theme-color" content="oklch(0.965 0.015 285)" />
+    <title>Name Constellation</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Bỏ qua đến nội dung chính</a>
+
+    <main id="main-content">
+      <section id="setup-view" class="view setup-view" aria-labelledby="setup-title">
+        <div class="setup-rail">
+          <div class="brand-mark" aria-label="Name Constellation">
+            <span class="brand-orbit" aria-hidden="true"><i></i></span>
+            <span>NAME<br />CONSTELLATION</span>
+          </div>
+          <p>Không cần tài khoản.<br />Dữ liệu ở lại trên máy này.</p>
+        </div>
+
+        <div class="setup-main">
+          <div class="setup-copy">
+            <p class="setup-intro">
+              Một trường chuyển động dành cho những cái tên đang chờ được gọi.
+            </p>
+            <h1 id="setup-title">Đặt tên cho<br />bầu không khí.</h1>
+          </div>
+
+          <form id="topic-form" class="topic-form" novalidate>
+            <label for="topic-input">Chủ đề hôm nay</label>
+            <div class="topic-field">
+              <input
+                id="topic-input"
+                name="topic"
+                type="text"
+                maxlength="80"
+                autocomplete="off"
+                placeholder="Ngày hội kết nối"
+                aria-describedby="topic-error"
+              />
+              <button class="launch-button" type="submit">
+                <span>Khởi tạo trường</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h13M13 6l6 6-6 6"></path>
+                </svg>
+              </button>
+            </div>
+            <p id="topic-error" class="field-error" role="alert"></p>
+          </form>
+        </div>
+
+        <div class="setup-visual" aria-hidden="true">
+          <div class="preview-field">
+            <span class="preview-ring preview-ring--outer"></span>
+            <span class="preview-ring preview-ring--middle"></span>
+            <span class="preview-ring preview-ring--inner"></span>
+            <span class="preview-node preview-node--one">Mặt Trời</span>
+            <span class="preview-node preview-node--two">Cầu Vồng</span>
+            <span class="preview-node preview-node--three">Kết Nối</span>
+            <span class="preview-node preview-node--four">Sáng Tạo</span>
+            <span class="preview-core"><b>?</b><i></i></span>
+          </div>
+          <p class="preview-caption">Mỗi cái tên · một quỹ đạo</p>
+        </div>
+      </section>
+
+      <section id="wheel-view" class="view constellation-view" aria-labelledby="topic-heading" hidden>
+        <header class="app-header">
+          <button
+            id="edit-topic-button"
+            class="topic-control"
+            type="button"
+            aria-label="Chỉnh sửa chủ đề"
+          >
+            <span class="brand-orbit brand-orbit--small" aria-hidden="true"><i></i></span>
+            <span class="topic-control-copy">
+              <small>Trường đang hoạt động</small>
+              <strong id="topic-heading"></strong>
+            </span>
+            <span class="edit-topic-hint">Đổi chủ đề</span>
+          </button>
+
+          <div class="header-actions">
+            <button
+              id="sound-button"
+              class="icon-button"
+              type="button"
+              aria-label="Bật âm thanh"
+              aria-pressed="false"
+              title="Bật hoặc tắt âm thanh"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 9v6h4l5 4V5L8 9H4Z"></path>
+                <path class="sound-wave" d="M16 8.5a5 5 0 0 1 0 7"></path>
+                <path class="sound-wave" d="M18.5 6a8.5 8.5 0 0 1 0 12"></path>
+              </svg>
+            </button>
+            <button
+              id="fullscreen-button"
+              class="icon-button"
+              type="button"
+              aria-label="Mở toàn màn hình"
+              title="Toàn màn hình"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="workspace">
+          <section class="constellation-stage" aria-labelledby="field-title">
+            <div class="stage-heading">
+              <div>
+                <span id="field-index">FIELD / 08</span>
+                <h1 id="field-title">Tên đang chuyển động.</h1>
+              </div>
+              <p id="wheel-status">Nhấn nút hoặc phím Space để kích hoạt.</p>
+            </div>
+
+            <div id="wheel-shell" class="field-shell">
+              <canvas
+                id="wheel-canvas"
+                role="img"
+                aria-label="Trường quỹ đạo gồm các tên nhóm"
+              ></canvas>
+              <div class="field-crosshair" aria-hidden="true">
+                <span></span><span></span>
+              </div>
+              <div class="field-coordinate field-coordinate--top" aria-hidden="true">
+                LIVE / RANDOM FIELD
+              </div>
+              <div class="field-coordinate field-coordinate--bottom" aria-hidden="true">
+                LOCAL TIME <span id="field-time">00:00:00</span>
+              </div>
+            </div>
+
+            <button id="spin-button" class="spin-button" type="button">
+              <span class="spin-button-core" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </span>
+              <span class="spin-button-copy">
+                <small>SPACE TO START</small>
+                <strong>KÍCH HOẠT VÒNG CHỌN</strong>
+              </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h13M13 6l6 6-6 6"></path>
+              </svg>
+            </button>
+          </section>
+
+          <aside class="roster-panel" aria-labelledby="roster-title">
+            <div class="roster-heading">
+              <div>
+                <p>Command deck</p>
+                <h2 id="roster-title">Các quỹ đạo</h2>
+              </div>
+              <span id="group-count" class="count-badge">0</span>
+            </div>
+
+            <div id="group-list" class="group-list"></div>
+
+            <form id="add-group-form" class="add-group-form" novalidate>
+              <label for="new-group-input">Thêm một cái tên</label>
+              <div class="add-group-row">
+                <input
+                  id="new-group-input"
+                  name="group"
+                  type="text"
+                  maxlength="60"
+                  autocomplete="off"
+                  placeholder="Tên nhóm..."
+                  aria-describedby="group-error"
+                />
+                <button class="add-button" type="submit" aria-label="Thêm nhóm">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14"></path>
+                  </svg>
+                </button>
+              </div>
+              <p id="group-error" class="field-error" role="alert"></p>
+            </form>
+
+            <div class="roster-footer">
+              <span class="live-dot" aria-hidden="true"></span>
+              Nhấp vào tên để sửa · tối thiểu 2 nhóm
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="result-dialog" class="result-dialog" aria-labelledby="result-title">
+      <button
+        id="dialog-close-button"
+        class="dialog-close"
+        type="button"
+        aria-label="Đóng và giữ nhóm trong trường"
+      >
+        ×
+      </button>
+      <div class="result-signal" aria-hidden="true">
+        <span></span><i></i><b></b>
+      </div>
+      <p class="result-kicker">TÍN HIỆU ĐÃ KHÓA</p>
+      <h2 id="result-title"></h2>
+      <p class="result-copy">Giữ quỹ đạo này hoạt động hay đưa nó ra khỏi trường?</p>
+      <div class="result-actions">
+        <button id="keep-button" class="button button--keep" type="button">
+          Giữ trong trường
+        </button>
+        <button id="remove-winner-button" class="button button--remove" type="button">
+          Xóa khỏi vòng
+        </button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+      <span id="toast-message"></span>
+      <button id="undo-button" type="button">Hoàn tác</button>
+    </div>
+
+    <div id="confetti-layer" class="signal-layer" aria-hidden="true"></div>
+    <p id="live-region" class="visually-hidden" aria-live="polite"></p>
+
+    <template id="group-item-template">
+      <div class="group-item">
+        <span class="group-number" aria-hidden="true"></span>
+        <span class="group-orbit-mark" aria-hidden="true"><i></i></span>
+        <label class="visually-hidden"></label>
+        <input class="group-name-input" type="text" maxlength="60" autocomplete="off" />
+        <button class="delete-group-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14"></path>
+          </svg>
+          <span class="visually-hidden">Xóa nhóm</span>
+        </button>
+      </div>
+    </template>
+  </body>
+</html>
